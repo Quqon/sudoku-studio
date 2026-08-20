@@ -205,8 +205,8 @@ export class SudokuGame {
     if (this.timedOut) return;
     this.showMistakes = true;
     this.refreshValidity();
-    const issueCount = this.conflictKeys.size + this.mistakeKeys.size;
-    this.lastMessage = issueCount ? `${issueCount}개의 확인할 숫자가 있습니다.` : "지금까지의 숫자는 규칙에 맞습니다.";
+    const issueCount = this.conflictKeys.size;
+    this.lastMessage = issueCount ? `${issueCount}개의 중복 숫자가 있습니다.` : "현재 배치에는 행·열·블록 중복이 없습니다.";
   }
 
   getProgress() {
@@ -346,15 +346,6 @@ export class SudokuGame {
       }
     }
 
-    if (this.showMistakes) {
-      for (let row = 0; row < 9; row += 1) {
-        for (let column = 0; column < 9; column += 1) {
-          if (!this.given[row][column] && this.values[row][column] && this.values[row][column] !== this.solution[row][column]) {
-            this.mistakeKeys.add(keyOf(row, column));
-          }
-        }
-      }
-    }
   }
 
   private checkCompletion() {
