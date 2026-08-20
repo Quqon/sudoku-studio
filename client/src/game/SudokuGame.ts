@@ -1,4 +1,4 @@
-import { createPuzzle, type Board, type Difficulty } from "./puzzle";
+import { createPuzzle, HINT_LIMIT, type Board, type Difficulty } from "./puzzle";
 
 export interface CellPosition {
   row: number;
@@ -28,6 +28,8 @@ export class SudokuGame {
   hintedKeys = new Set<string>();
   history: HistoryEntry[] = [];
   elapsedSeconds = 0;
+  hintLimit = HINT_LIMIT["보통"];
+  hintsUsed = 0;
   completed = false;
   completedAt = 0;
   lastMessage = "칸을 선택해 숫자를 놓으세요.";
@@ -53,6 +55,8 @@ export class SudokuGame {
     this.hintedKeys.clear();
     this.history = [];
     this.elapsedSeconds = 0;
+    this.hintLimit = HINT_LIMIT[difficulty];
+    this.hintsUsed = 0;
     this.completed = false;
     this.completedAt = 0;
     this.secondAccumulator = 0;
@@ -153,6 +157,10 @@ export class SudokuGame {
 
   hint() {
     if (this.completed) return;
+    if (this.hintsUsed >= this.hintLimit) {
+      this.lastMessage = `이 난이도의 힌트를 모두 사용했습니다. (${this.hintLimit}/${this.hintLimit})`;
+      return;
+    }
     const selectedIsEmpty = this.selected && !this.given[this.selected.row][this.selected.column] && this.values[this.selected.row][this.selected.column] === 0;
     const position = selectedIsEmpty
       ? this.selected
@@ -166,9 +174,10 @@ export class SudokuGame {
     this.notes[position.row][position.column] = [];
     this.selected = position;
     this.hintedKeys.add(keyOf(position.row, position.column));
+    this.hintsUsed += 1;
     this.refreshValidity();
     this.checkCompletion();
-    this.lastMessage = `힌트 · ${position.row + 1}행 ${position.column + 1}열에 ${this.solution[position.row][position.column]}을 놓았습니다.`;
+    this.lastMessage = `힌트 · ${position.row + 1}행 ${position.column + 1}열에 ${this.solution[position.row][position.column]}을 놓았습니다. (${this.getHintsRemaining()}회 남음)`;
   }
 
   validate() {
@@ -218,6 +227,10 @@ export class SudokuGame {
 
   isHinted(row: number, column: number) {
     return this.hintedKeys.has(keyOf(row, column));
+  }
+
+  getHintsRemaining() {
+    return Math.max(0, this.hintLimit - this.hintsUsed);
   }
 
   private firstOpenCell(): CellPosition | null {

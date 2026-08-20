@@ -392,6 +392,7 @@ export class GameWorld {
     const titleSize = compact ? Math.max(25, Math.round(layout.height * 0.035)) : Math.max(25, Math.round(layout.height * 0.043 * scale));
     const line = Math.max(1, layout.height * 0.0015);
     const progress = this.game.getProgress();
+    const hintsRemaining = this.game.getHintsRemaining();
     const panelHeight = compact ? layout.height - y - 12 : Math.min(layout.height * 0.74, 680);
 
     ctx.fillStyle = "rgba(255,252,245,0.66)";
@@ -419,7 +420,7 @@ export class GameWorld {
     ctx.fillStyle = COLORS.softInk;
     ctx.font = `500 ${labelSize}px "IBM Plex Sans KR", sans-serif`;
     ctx.textAlign = "right";
-    ctx.fillText(`${progress.filled}/${progress.total} 채움`, x + width - pad, y + pad + labelSize + titleSize + 2);
+    ctx.fillText(`${progress.filled}/${progress.total} 채움 · 남은 힌트 ${hintsRemaining}/${this.game.hintLimit}`, x + width - pad, y + pad + labelSize + titleSize + 2);
     ctx.textAlign = "left";
 
     const difficultyY = y + pad + labelSize + titleSize + (compact ? 18 : 34);
@@ -442,7 +443,7 @@ export class GameWorld {
     const actionHeight = compact ? Math.max(25, labelSize * 2.35) : Math.max(31, labelSize * 2.65);
     this.drawButton(ctx, x + pad, actionY, actionWidth, actionHeight, this.game.noteMode ? "메모 ON" : "메모", "notes", this.game.noteMode, layout);
     this.drawButton(ctx, x + pad + actionWidth + actionGap, actionY, actionWidth, actionHeight, "되돌리기", "undo", false, layout);
-    this.drawButton(ctx, x + pad, actionY + actionHeight + actionGap, actionWidth, actionHeight, "힌트 · 1칸", "hint", false, layout);
+    this.drawButton(ctx, x + pad, actionY + actionHeight + actionGap, actionWidth, actionHeight, `힌트 · ${hintsRemaining}회`, "hint", false, layout, undefined, false, hintsRemaining === 0);
     this.drawButton(ctx, x + pad + actionWidth + actionGap, actionY + actionHeight + actionGap, actionWidth, actionHeight, "검증", "validate", false, layout);
 
     const numberY = actionY + actionHeight * 2 + actionGap + (compact ? 17 : 24);
@@ -500,20 +501,21 @@ export class GameWorld {
     layout: Layout,
     value?: number,
     number = false,
+    disabled = false,
   ) {
-    ctx.fillStyle = active ? COLORS.cobalt : "rgba(255,255,255,0.54)";
+    ctx.fillStyle = disabled ? "rgba(34,33,30,0.05)" : active ? COLORS.cobalt : "rgba(255,255,255,0.54)";
     ctx.fillRect(x, y, width, height);
-    ctx.strokeStyle = active ? COLORS.cobalt : "rgba(34,33,30,0.24)";
+    ctx.strokeStyle = disabled ? "rgba(34,33,30,0.11)" : active ? COLORS.cobalt : "rgba(34,33,30,0.24)";
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
-    ctx.fillStyle = active ? "#ffffff" : number ? COLORS.cobalt : COLORS.ink;
+    ctx.fillStyle = disabled ? COLORS.softInk : active ? "#ffffff" : number ? COLORS.cobalt : COLORS.ink;
     ctx.font = `${number ? 700 : 600} ${number ? Math.max(16, height * 0.54) : Math.max(10, height * 0.34)}px ${number ? "\"DM Serif Display\", Georgia, serif" : "\"IBM Plex Sans KR\", sans-serif"}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, x + width / 2, y + height / 2 + 1);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    this.hitTargets.push({ x, y, width, height, action, value });
+    if (!disabled) this.hitTargets.push({ x, y, width, height, action, value });
   }
 
   private drawCompletion(ctx: CanvasRenderingContext2D, layout: Layout) {

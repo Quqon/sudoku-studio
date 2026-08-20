@@ -8,6 +8,12 @@ export const CLUE_COUNT: Record<Difficulty, number> = {
   어려움: 27,
 };
 
+export const HINT_LIMIT: Record<Difficulty, number> = {
+  쉬움: 5,
+  보통: 3,
+  어려움: 2,
+};
+
 const BASE_SOLUTION: Board = [
   [5, 3, 4, 6, 7, 8, 9, 1, 2],
   [6, 7, 2, 1, 9, 5, 3, 4, 8],
