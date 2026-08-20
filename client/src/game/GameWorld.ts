@@ -250,28 +250,29 @@ export class GameWorld {
   }
 
   private drawHeader(ctx: CanvasRenderingContext2D, layout: Layout) {
-    const x = layout.compact ? layout.width * 0.06 : layout.boardX;
-    const y = layout.height * 0.045;
-    const markSize = Math.min(48, layout.height * 0.055);
+    const touchHeader = layout.compact && layout.width <= 560;
+    const x = layout.compact ? layout.width * (touchHeader ? 0.05 : 0.06) : layout.boardX;
+    const y = touchHeader ? Math.max(14, layout.height * 0.024) : layout.height * 0.045;
+    const markSize = touchHeader ? 28 : Math.min(48, layout.height * 0.055);
     if (this.images.mark) ctx.drawImage(this.images.mark, x, y, markSize, markSize);
     else this.drawFallbackMark(ctx, x, y, markSize);
 
     ctx.fillStyle = COLORS.ink;
-    ctx.font = `700 ${Math.round(markSize * 0.68)}px "DM Serif Display", Georgia, serif`;
+    ctx.font = `700 ${Math.round(markSize * (touchHeader ? 0.62 : 0.68))}px "DM Serif Display", Georgia, serif`;
     ctx.textBaseline = "alphabetic";
-    ctx.fillText("SUDOKU", x + markSize + 13, y + markSize * 0.58);
+    ctx.fillText("SUDOKU", x + markSize + (touchHeader ? 8 : 13), y + markSize * 0.58);
     ctx.fillStyle = COLORS.cobalt;
-    ctx.font = `700 ${Math.max(10, Math.round(markSize * 0.22))}px "IBM Plex Sans KR", sans-serif`;
+    ctx.font = `700 ${touchHeader ? 7 : Math.max(10, Math.round(markSize * 0.22))}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.18em";
-    ctx.fillText("STUDIO / NO. 09", x + markSize + 16, y + markSize * 0.9);
+    ctx.fillText("STUDIO / NO. 09", x + markSize + (touchHeader ? 9 : 16), y + markSize * 0.9);
     ctx.letterSpacing = "0px";
 
-    const buttonWidth = layout.compact ? layout.width * 0.19 : Math.min(132, layout.width * 0.12);
-    const buttonHeight = Math.max(30, layout.height * 0.048);
+    const buttonWidth = touchHeader ? 66 : layout.compact ? layout.width * 0.19 : Math.min(132, layout.width * 0.12);
+    const buttonHeight = touchHeader ? 28 : Math.max(30, layout.height * 0.048);
     const buttonX = layout.compact
-      ? layout.width - layout.width * 0.06 - buttonWidth
+      ? layout.width - layout.width * (touchHeader ? 0.05 : 0.06) - buttonWidth
       : layout.sidebarX + layout.sidebarWidth - buttonWidth;
-    this.drawButton(ctx, buttonX, y + 4, buttonWidth, buttonHeight, "새 게임", "new", false, layout);
+    this.drawButton(ctx, buttonX, y + (touchHeader ? 0 : 4), buttonWidth, buttonHeight, "새 게임", "new", false, layout);
 
     if (!layout.compact) {
       ctx.fillStyle = COLORS.softInk;
@@ -443,14 +444,16 @@ export class GameWorld {
     const line = Math.max(1, layout.height * 0.0015);
     const progress = this.game.getProgress();
     const hintsRemaining = this.game.getHintsRemaining();
-    const panelHeight = compact ? layout.height - y - (touchLayout ? 8 : 12) : Math.min(layout.height * 0.74, 680);
+    const panelHeight = compact
+      ? layout.height - y - (touchLayout ? 8 : 12)
+      : Math.min(layout.height - y - Math.max(24, layout.height * 0.03), Math.max(720, layout.height * 0.74));
 
     ctx.fillStyle = "rgba(255,252,245,0.66)";
     ctx.fillRect(x, y, width, panelHeight);
     ctx.strokeStyle = "rgba(34,33,30,0.14)";
     ctx.lineWidth = line;
     ctx.strokeRect(x + line / 2, y + line / 2, width - line, panelHeight - line);
-    if (this.images.motif) {
+    if (compact && this.images.motif) {
       ctx.save();
       ctx.globalAlpha = 0.13;
       const motifHeight = Math.min(panelHeight * 0.25, width * 0.6);
@@ -515,29 +518,21 @@ export class GameWorld {
     const eraseHeight = touchLayout ? 36 : compact ? Math.max(24, labelSize * 2.25) : Math.max(29, labelSize * 2.45);
     this.drawButton(ctx, x + pad, eraseY, width - pad * 2, eraseHeight, "지우기", "erase", false, layout);
 
-    const messageY = Math.min(panelHeight - (compact ? 18 : 22), eraseY - y + eraseHeight + (touchLayout ? 33 : compact ? 43 : Math.max(58, labelSize * 4.7)));
-    ctx.fillStyle = "rgba(40,84,197,0.09)";
     const messageHeight = compact ? 27 : 34;
-    ctx.fillRect(x + pad, y + messageY - messageHeight, width - pad * 2, messageHeight);
+    const footerReserve = compact ? 18 : 26;
+    const messageTop = Math.min(
+      y + panelHeight - footerReserve - messageHeight,
+      eraseY + eraseHeight + (touchLayout ? 14 : compact ? 18 : 24),
+    );
+    ctx.fillStyle = "rgba(40,84,197,0.09)";
+    ctx.fillRect(x + pad, messageTop, width - pad * 2, messageHeight);
     ctx.fillStyle = COLORS.cobalt;
     ctx.font = `500 ${Math.max(10, labelSize * 0.95)}px "IBM Plex Sans KR", sans-serif`;
-    ctx.fillText(this.game.lastMessage, x + pad + 10, y + messageY - (compact ? 10 : 13), width - pad * 2 - 20);
-
-    if (!compact && this.images.reference && panelHeight > 520) {
-      const referenceY = y + panelHeight - Math.min(126, panelHeight * 0.19);
-      const referenceHeight = Math.min(110, panelHeight * 0.17);
-      ctx.save();
-      ctx.globalAlpha = 0.42;
-      ctx.drawImage(this.images.reference, x + pad, referenceY, width - pad * 2, referenceHeight);
-      ctx.restore();
-      ctx.fillStyle = COLORS.ink;
-      ctx.font = `700 ${Math.max(9, labelSize * 0.8)}px "IBM Plex Sans KR", sans-serif`;
-      ctx.fillText("PRINTED PUZZLE DESK", x + pad + 7, referenceY + 16);
-    }
+    ctx.fillText(this.game.lastMessage, x + pad + 10, messageTop + messageHeight * 0.61, width - pad * 2 - 20);
 
     ctx.fillStyle = COLORS.softInk;
     ctx.font = `500 ${Math.max(9, labelSize * 0.86)}px "IBM Plex Sans KR", sans-serif`;
-    ctx.fillText(compact ? "N 메모 · H 힌트 · V 검증" : "N 메모 · H 힌트 · V 검증 · Z 되돌리기", x + pad, y + panelHeight - 10);
+    ctx.fillText(compact ? "N 메모 · H 힌트 · V 검증" : "N 메모 · H 힌트 · V 검증 · Z 되돌리기", x + pad, y + panelHeight - (compact ? 10 : 13));
   }
 
   private drawButton(
