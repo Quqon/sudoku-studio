@@ -47,6 +47,7 @@ const COLORS = {
   softInk: "#64615b",
   cobalt: "#2854c5",
   cobaltPale: "#dfe8fb",
+  hintInk: "#617918",
   paper: "#f6f0e6",
   paperDeep: "#ece3d4",
   chartreuse: "#bad842",
@@ -293,6 +294,7 @@ export class GameWorld {
         const y = boardY + row * cell;
         const selected = this.game.selected?.row === row && this.game.selected?.column === column;
         const conflict = this.game.conflictKeys.has(`${row}:${column}`) || this.game.mistakeKeys.has(`${row}:${column}`);
+        const hinted = this.game.isHinted(row, column);
         if (this.game.isRelated(row, column)) {
           ctx.fillStyle = "rgba(40,84,197,0.075)";
           ctx.fillRect(x, y, cell, cell);
@@ -304,6 +306,10 @@ export class GameWorld {
         if (conflict) {
           ctx.fillStyle = "rgba(201,83,58,0.15)";
           ctx.fillRect(x, y, cell, cell);
+        }
+        if (hinted) {
+          ctx.fillStyle = "rgba(186,216,66,0.24)";
+          ctx.fillRect(x + cell * 0.08, y + cell * 0.08, cell * 0.84, cell * 0.84);
         }
         if (selected) {
           ctx.fillStyle = "rgba(186,216,66,0.28)";
@@ -335,12 +341,17 @@ export class GameWorld {
         const y = boardY + row * cell;
         const value = this.game.values[row][column];
         const conflict = this.game.conflictKeys.has(`${row}:${column}`) || this.game.mistakeKeys.has(`${row}:${column}`);
+        const hinted = this.game.isHinted(row, column);
         if (value) {
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.font = `${this.game.given[row][column] ? 700 : 600} ${Math.round(cell * 0.52)}px "IBM Plex Sans KR", sans-serif`;
-          ctx.fillStyle = conflict ? COLORS.vermilion : this.game.given[row][column] ? COLORS.ink : COLORS.cobalt;
+          ctx.fillStyle = conflict ? COLORS.vermilion : hinted ? COLORS.hintInk : this.game.given[row][column] ? COLORS.ink : COLORS.cobalt;
           ctx.fillText(String(value), x + cell / 2, y + cell / 2 + cell * 0.025);
+          if (hinted) {
+            ctx.fillStyle = COLORS.hintInk;
+            ctx.fillRect(x + cell * 0.76, y + cell * 0.76, Math.max(3, cell * 0.11), Math.max(3, cell * 0.11));
+          }
           ctx.textAlign = "left";
           ctx.textBaseline = "alphabetic";
         } else if (this.game.notes[row][column].length) {
@@ -431,7 +442,7 @@ export class GameWorld {
     const actionHeight = compact ? Math.max(25, labelSize * 2.35) : Math.max(31, labelSize * 2.65);
     this.drawButton(ctx, x + pad, actionY, actionWidth, actionHeight, this.game.noteMode ? "메모 ON" : "메모", "notes", this.game.noteMode, layout);
     this.drawButton(ctx, x + pad + actionWidth + actionGap, actionY, actionWidth, actionHeight, "되돌리기", "undo", false, layout);
-    this.drawButton(ctx, x + pad, actionY + actionHeight + actionGap, actionWidth, actionHeight, "힌트", "hint", false, layout);
+    this.drawButton(ctx, x + pad, actionY + actionHeight + actionGap, actionWidth, actionHeight, "힌트 · 1칸", "hint", false, layout);
     this.drawButton(ctx, x + pad + actionWidth + actionGap, actionY + actionHeight + actionGap, actionWidth, actionHeight, "검증", "validate", false, layout);
 
     const numberY = actionY + actionHeight * 2 + actionGap + (compact ? 17 : 24);

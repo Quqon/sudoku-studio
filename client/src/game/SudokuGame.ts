@@ -25,6 +25,7 @@ export class SudokuGame {
   showMistakes = false;
   conflictKeys = new Set<string>();
   mistakeKeys = new Set<string>();
+  hintedKeys = new Set<string>();
   history: HistoryEntry[] = [];
   elapsedSeconds = 0;
   completed = false;
@@ -49,6 +50,7 @@ export class SudokuGame {
     this.showMistakes = false;
     this.conflictKeys.clear();
     this.mistakeKeys.clear();
+    this.hintedKeys.clear();
     this.history = [];
     this.elapsedSeconds = 0;
     this.completed = false;
@@ -119,6 +121,7 @@ export class SudokuGame {
     } else {
       this.values[row][column] = digit;
       this.notes[row][column] = [];
+      this.hintedKeys.delete(keyOf(row, column));
       this.lastMessage = `숫자 ${digit}을 놓았습니다.`;
       this.refreshValidity();
       this.checkCompletion();
@@ -131,6 +134,7 @@ export class SudokuGame {
     this.remember(position);
     this.values[position.row][position.column] = 0;
     this.notes[position.row][position.column] = [];
+    this.hintedKeys.delete(keyOf(position.row, position.column));
     this.refreshValidity();
     this.lastMessage = "칸을 비웠습니다.";
   }
@@ -141,6 +145,7 @@ export class SudokuGame {
     const { row, column } = entry.position;
     this.values[row][column] = entry.value;
     this.notes[row][column] = entry.notes;
+    this.hintedKeys.delete(keyOf(row, column));
     this.selected = entry.position;
     this.refreshValidity();
     this.lastMessage = "마지막 입력을 되돌렸습니다.";
@@ -148,18 +153,22 @@ export class SudokuGame {
 
   hint() {
     if (this.completed) return;
-    const selectedIsOpen = this.selected && !this.given[this.selected.row][this.selected.column];
-    const position = selectedIsOpen
+    const selectedIsEmpty = this.selected && !this.given[this.selected.row][this.selected.column] && this.values[this.selected.row][this.selected.column] === 0;
+    const position = selectedIsEmpty
       ? this.selected
       : this.firstOpenCell();
-    if (!position) return;
+    if (!position) {
+      this.lastMessage = "힌트가 필요 없는 상태입니다. 모든 빈칸을 채웠습니다.";
+      return;
+    }
     this.remember(position);
     this.values[position.row][position.column] = this.solution[position.row][position.column];
     this.notes[position.row][position.column] = [];
     this.selected = position;
+    this.hintedKeys.add(keyOf(position.row, position.column));
     this.refreshValidity();
     this.checkCompletion();
-    this.lastMessage = "한 칸에 단서를 놓았습니다.";
+    this.lastMessage = `힌트 · ${position.row + 1}행 ${position.column + 1}열에 ${this.solution[position.row][position.column]}을 놓았습니다.`;
   }
 
   validate() {
@@ -205,6 +214,10 @@ export class SudokuGame {
     if (!selected) return false;
     const value = this.values[selected.row][selected.column];
     return value !== 0 && this.values[row][column] === value;
+  }
+
+  isHinted(row: number, column: number) {
+    return this.hintedKeys.has(keyOf(row, column));
   }
 
   private firstOpenCell(): CellPosition | null {
