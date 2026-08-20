@@ -78,6 +78,7 @@ export class GameWorld {
     this.input = new InputManager((action) => this.handleAction(action));
     this.onPointerDown = (event) => this.handlePointer(event);
     canvas.addEventListener("pointerdown", this.onPointerDown);
+    if (new URLSearchParams(window.location.search).has("timeout")) this.game.forceTimeUpForPreview();
     this.loadImages();
     this.resize();
   }
@@ -145,6 +146,19 @@ export class GameWorld {
     const rect = this.canvas.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * layout.width;
     const y = ((event.clientY - rect.top) / rect.height) * layout.height;
+    const hit = [...this.hitTargets].reverse().find((target) => x >= target.x && x <= target.x + target.width && y >= target.y && y <= target.y + target.height);
+    if (hit) {
+      if (hit.action === "digit" && hit.value) this.game.setDigit(hit.value);
+      if (hit.action === "notes") this.game.toggleNotes();
+      if (hit.action === "erase") this.game.erase();
+      if (hit.action === "undo") this.game.undo();
+      if (hit.action === "hint") this.game.hint();
+      if (hit.action === "validate") this.game.validate();
+      if (hit.action === "new") this.game.newGame();
+      if (["쉬움", "보통", "어려움"].includes(hit.action)) this.game.newGame(hit.action as Difficulty);
+      this.dirty = true;
+      return;
+    }
     const { boardX, boardY, boardSize } = layout;
     if (x >= boardX && x <= boardX + boardSize && y >= boardY && y <= boardY + boardSize) {
       const cell = boardSize / 9;
@@ -152,17 +166,6 @@ export class GameWorld {
       this.dirty = true;
       return;
     }
-    const hit = [...this.hitTargets].reverse().find((target) => x >= target.x && x <= target.x + target.width && y >= target.y && y <= target.y + target.height);
-    if (!hit) return;
-    if (hit.action === "digit" && hit.value) this.game.setDigit(hit.value);
-    if (hit.action === "notes") this.game.toggleNotes();
-    if (hit.action === "erase") this.game.erase();
-    if (hit.action === "undo") this.game.undo();
-    if (hit.action === "hint") this.game.hint();
-    if (hit.action === "validate") this.game.validate();
-    if (hit.action === "new") this.game.newGame();
-    if (["쉬움", "보통", "어려움"].includes(hit.action)) this.game.newGame(hit.action as Difficulty);
-    this.dirty = true;
   }
 
   private getLayout(width: number, height: number): Layout {
@@ -209,6 +212,7 @@ export class GameWorld {
     this.drawBoard(ctx, layout);
     this.drawSidebar(ctx, layout);
     if (this.game.completed) this.drawCompletion(ctx, layout);
+    else if (this.game.timedOut) this.drawTimeUp(ctx, layout);
     this.texture.update();
     this.dirty = false;
   }
@@ -414,13 +418,14 @@ export class GameWorld {
     ctx.letterSpacing = "0.15em";
     ctx.fillText("MARGIN NOTES", x + pad, y + pad + labelSize);
     ctx.letterSpacing = "0px";
-    ctx.fillStyle = COLORS.ink;
+    ctx.fillStyle = this.game.isLowOnTime() ? COLORS.vermilion : COLORS.ink;
     ctx.font = `400 ${titleSize}px "DM Serif Display", Georgia, serif`;
     ctx.fillText(this.game.formatTime(), x + pad, y + pad + labelSize + titleSize + 8);
     ctx.fillStyle = COLORS.softInk;
     ctx.font = `500 ${labelSize}px "IBM Plex Sans KR", sans-serif`;
     ctx.textAlign = "right";
-    ctx.fillText(`${progress.filled}/${progress.total} 채움 · 남은 힌트 ${hintsRemaining}/${this.game.hintLimit}`, x + width - pad, y + pad + labelSize + titleSize + 2);
+    const limitMinutes = Math.ceil(this.game.timeLimitSeconds / 60);
+    ctx.fillText(`타임어택 ${limitMinutes}분 · ${progress.filled}/${progress.total} 채움 · 힌트 ${hintsRemaining}/${this.game.hintLimit}`, x + width - pad, y + pad + labelSize + titleSize + 2);
     ctx.textAlign = "left";
 
     const difficultyY = y + pad + labelSize + titleSize + (compact ? 18 : 34);
@@ -542,7 +547,34 @@ export class GameWorld {
     ctx.fillText("정확한 한 수였습니다.", x + width * 0.13, y + height * 0.5);
     ctx.fillStyle = COLORS.softInk;
     ctx.font = `500 ${Math.max(12, height * 0.065)}px "IBM Plex Sans KR", sans-serif`;
-    ctx.fillText(`${this.game.formatTime()} · ${this.game.difficulty} 난이도`, x + width * 0.13, y + height * 0.65);
+    ctx.fillText(`남은 시간 ${this.game.formatTime()} · ${this.game.difficulty} 난이도`, x + width * 0.13, y + height * 0.65);
     this.drawButton(ctx, x + width * 0.13, y + height * 0.74, width * 0.43, height * 0.14, "다음 퍼즐", "new", false, layout);
+  }
+
+  private drawTimeUp(ctx: CanvasRenderingContext2D, layout: Layout) {
+    ctx.fillStyle = "rgba(34,33,30,0.38)";
+    ctx.fillRect(0, 0, layout.width, layout.height);
+    const width = Math.min(layout.width * 0.55, 540);
+    const height = Math.min(layout.height * 0.35, 300);
+    const x = (layout.width - width) / 2;
+    const y = (layout.height - height) / 2;
+    ctx.fillStyle = "rgba(255,252,245,0.98)";
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+    ctx.fillStyle = COLORS.vermilion;
+    ctx.fillRect(x, y, 8, height);
+    ctx.font = `700 ${Math.max(12, height * 0.06)}px "IBM Plex Sans KR", sans-serif`;
+    ctx.letterSpacing = "0.16em";
+    ctx.fillText("TIME UP", x + width * 0.13, y + height * 0.27);
+    ctx.letterSpacing = "0px";
+    ctx.fillStyle = COLORS.ink;
+    ctx.font = `400 ${Math.max(30, height * 0.18)}px "DM Serif Display", Georgia, serif`;
+    ctx.fillText("시간이 끝났습니다.", x + width * 0.13, y + height * 0.5);
+    ctx.fillStyle = COLORS.softInk;
+    ctx.font = `500 ${Math.max(12, height * 0.065)}px "IBM Plex Sans KR", sans-serif`;
+    ctx.fillText(`${this.game.difficulty} · ${Math.ceil(this.game.timeLimitSeconds / 60)}분 타임어택`, x + width * 0.13, y + height * 0.65);
+    this.drawButton(ctx, x + width * 0.13, y + height * 0.74, width * 0.43, height * 0.14, "다시 도전", "new", false, layout);
   }
 }

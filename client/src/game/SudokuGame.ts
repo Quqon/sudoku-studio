@@ -1,4 +1,4 @@
-import { createPuzzle, HINT_LIMIT, type Board, type Difficulty } from "./puzzle";
+import { createPuzzle, HINT_LIMIT, TIME_LIMIT_SECONDS, type Board, type Difficulty } from "./puzzle";
 
 export interface CellPosition {
   row: number;
@@ -28,9 +28,12 @@ export class SudokuGame {
   hintedKeys = new Set<string>();
   history: HistoryEntry[] = [];
   elapsedSeconds = 0;
+  timeLimitSeconds = TIME_LIMIT_SECONDS["보통"];
+  remainingSeconds = TIME_LIMIT_SECONDS["보통"];
   hintLimit = HINT_LIMIT["보통"];
   hintsUsed = 0;
   completed = false;
+  timedOut = false;
   completedAt = 0;
   lastMessage = "칸을 선택해 숫자를 놓으세요.";
   private secondAccumulator = 0;
@@ -55,12 +58,15 @@ export class SudokuGame {
     this.hintedKeys.clear();
     this.history = [];
     this.elapsedSeconds = 0;
+    this.timeLimitSeconds = TIME_LIMIT_SECONDS[difficulty];
+    this.remainingSeconds = this.timeLimitSeconds;
     this.hintLimit = HINT_LIMIT[difficulty];
     this.hintsUsed = 0;
     this.completed = false;
+    this.timedOut = false;
     this.completedAt = 0;
     this.secondAccumulator = 0;
-    this.lastMessage = "새 퍼즐을 준비했습니다.";
+    this.lastMessage = "새 타임어택 퍼즐을 준비했습니다.";
   }
 
   applyDemoState() {
@@ -75,26 +81,35 @@ export class SudokuGame {
     });
     this.selected = emptyCells[0] ?? null;
     this.elapsedSeconds = 266;
-    this.lastMessage = "데모: 마무리할 네 칸이 남았습니다.";
+    this.remainingSeconds = Math.max(0, this.timeLimitSeconds - this.elapsedSeconds);
+    this.lastMessage = "데모: 제한 시간 안에 마무리할 네 칸이 남았습니다.";
   }
 
   tick(deltaSeconds: number): boolean {
-    if (this.completed) return false;
+    if (this.completed || this.timedOut) return false;
     this.secondAccumulator += deltaSeconds;
     if (this.secondAccumulator < 1) return false;
     const seconds = Math.floor(this.secondAccumulator);
     this.elapsedSeconds += seconds;
+    this.remainingSeconds = Math.max(0, this.remainingSeconds - seconds);
     this.secondAccumulator -= seconds;
+    if (this.remainingSeconds === 0) {
+      this.timedOut = true;
+      this.secondAccumulator = 0;
+      this.lastMessage = "시간이 끝났습니다. 새 퍼즐로 다시 도전하세요.";
+    }
     return true;
   }
 
   select(row: number, column: number) {
+    if (this.timedOut) return;
     this.selected = { row, column };
     if (this.given[row][column]) this.lastMessage = "인쇄된 단서입니다.";
     else this.lastMessage = this.noteMode ? "메모를 기록하는 중입니다." : "숫자를 입력하거나 메모를 남기세요.";
   }
 
   moveSelection(rowDelta: number, columnDelta: number) {
+    if (this.timedOut) return;
     const current = this.selected ?? { row: 4, column: 4 };
     const row = (current.row + rowDelta + 9) % 9;
     const column = (current.column + columnDelta + 9) % 9;
@@ -102,13 +117,14 @@ export class SudokuGame {
   }
 
   toggleNotes() {
+    if (this.timedOut) return;
     this.noteMode = !this.noteMode;
     this.lastMessage = this.noteMode ? "메모 모드: 후보 숫자를 누적합니다." : "입력 모드: 큰 숫자를 놓습니다.";
   }
 
   setDigit(digit: number) {
     const position = this.selected;
-    if (!position || this.given[position.row][position.column] || this.completed) return;
+    if (!position || this.given[position.row][position.column] || this.completed || this.timedOut) return;
     const { row, column } = position;
     this.remember(position);
 
@@ -134,7 +150,7 @@ export class SudokuGame {
 
   erase() {
     const position = this.selected;
-    if (!position || this.given[position.row][position.column] || this.completed) return;
+    if (!position || this.given[position.row][position.column] || this.completed || this.timedOut) return;
     this.remember(position);
     this.values[position.row][position.column] = 0;
     this.notes[position.row][position.column] = [];
@@ -145,7 +161,7 @@ export class SudokuGame {
 
   undo() {
     const entry = this.history.pop();
-    if (!entry || this.completed) return;
+    if (!entry || this.completed || this.timedOut) return;
     const { row, column } = entry.position;
     this.values[row][column] = entry.value;
     this.notes[row][column] = entry.notes;
@@ -156,15 +172,13 @@ export class SudokuGame {
   }
 
   hint() {
-    if (this.completed) return;
+    if (this.completed || this.timedOut) return;
     if (this.hintsUsed >= this.hintLimit) {
       this.lastMessage = `이 난이도의 힌트를 모두 사용했습니다. (${this.hintLimit}/${this.hintLimit})`;
       return;
     }
     const selectedIsEmpty = this.selected && !this.given[this.selected.row][this.selected.column] && this.values[this.selected.row][this.selected.column] === 0;
-    const position = selectedIsEmpty
-      ? this.selected
-      : this.firstOpenCell();
+    const position = selectedIsEmpty ? this.selected : this.firstOpenCell();
     if (!position) {
       this.lastMessage = "힌트가 필요 없는 상태입니다. 모든 빈칸을 채웠습니다.";
       return;
@@ -181,6 +195,7 @@ export class SudokuGame {
   }
 
   validate() {
+    if (this.timedOut) return;
     this.showMistakes = true;
     this.refreshValidity();
     const issueCount = this.conflictKeys.size + this.mistakeKeys.size;
@@ -202,9 +217,24 @@ export class SudokuGame {
   }
 
   formatTime() {
-    const minutes = Math.floor(this.elapsedSeconds / 60).toString().padStart(2, "0");
-    const seconds = (this.elapsedSeconds % 60).toString().padStart(2, "0");
+    const minutes = Math.floor(this.remainingSeconds / 60).toString().padStart(2, "0");
+    const seconds = (this.remainingSeconds % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
+  }
+
+  getTimeRatio() {
+    return this.timeLimitSeconds ? this.remainingSeconds / this.timeLimitSeconds : 0;
+  }
+
+  isLowOnTime() {
+    return this.remainingSeconds > 0 && this.remainingSeconds <= 60;
+  }
+
+  forceTimeUpForPreview() {
+    this.remainingSeconds = 0;
+    this.secondAccumulator = 0;
+    this.timedOut = true;
+    this.lastMessage = "시간이 끝났습니다. 새 퍼즐로 다시 도전하세요.";
   }
 
   isRelated(row: number, column: number) {
@@ -213,8 +243,7 @@ export class SudokuGame {
     return (
       row === selected.row ||
       column === selected.column ||
-      (Math.floor(row / 3) === Math.floor(selected.row / 3) &&
-        Math.floor(column / 3) === Math.floor(selected.column / 3))
+      (Math.floor(row / 3) === Math.floor(selected.row / 3) && Math.floor(column / 3) === Math.floor(selected.column / 3))
     );
   }
 
