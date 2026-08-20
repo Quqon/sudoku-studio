@@ -17,7 +17,7 @@ export const HINT_LIMIT: Record<Difficulty, number> = {
 export const TIME_LIMIT_SECONDS: Record<Difficulty, number> = {
   쉬움: 10 * 60,
   보통: 7 * 60,
-  어려움: 5 * 60,
+  어려움: 10 * 60,
 };
 
 const BASE_SOLUTION: Board = [
