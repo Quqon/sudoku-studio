@@ -8,6 +8,10 @@ export type GameAction =
   | { type: "new" }
   | { type: "move"; row: number; column: number };
 
+const IME_SHORTCUT_ALIASES: Record<string, string> = {
+  "ㅜ": "n",
+};
+
 export class InputManager {
   private readonly onKeyDown: (event: KeyboardEvent) => void;
 
@@ -16,7 +20,7 @@ export class InputManager {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const letterKey = event.key.toLowerCase();
       const physicalLetter = event.code.startsWith("Key") ? event.code.slice(3).toLowerCase() : "";
-      const shortcut = /^[a-z]$/.test(letterKey) ? letterKey : physicalLetter;
+      const shortcut = IME_SHORTCUT_ALIASES[letterKey] ?? (/^[a-z]$/.test(letterKey) ? letterKey : physicalLetter);
       let action: GameAction | null = null;
       if (/^[1-9]$/.test(event.key)) action = { type: "digit", digit: Number(event.key) };
       if (["Backspace", "Delete", "0"].includes(event.key)) action = { type: "erase" };
