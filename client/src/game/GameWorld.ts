@@ -56,7 +56,10 @@ const COLORS = {
 };
 
 export class GameWorld {
-  readonly game = new SudokuGame("보통", new URLSearchParams(window.location.search).has("demo"));
+  readonly game = new SudokuGame(
+    new URLSearchParams(window.location.search).has("paint") ? "어려움" : "보통",
+    new URLSearchParams(window.location.search).has("demo"),
+  );
   private readonly texture: DynamicTexture;
   private readonly context: CanvasRenderingContext2D;
   private readonly input: InputManager;
@@ -79,6 +82,7 @@ export class GameWorld {
     this.onPointerDown = (event) => this.handlePointer(event);
     canvas.addEventListener("pointerdown", this.onPointerDown);
     if (new URLSearchParams(window.location.search).has("timeout")) this.game.forceTimeUpForPreview();
+    if (new URLSearchParams(window.location.search).has("paint")) this.game.forcePaintEventForPreview();
     this.loadImages();
     this.resize();
   }
@@ -364,6 +368,16 @@ export class GameWorld {
       }
     }
 
+    if (this.game.paintEventRemaining > 0) {
+      for (let row = 0; row < 9; row += 1) {
+        for (let column = 0; column < 9; column += 1) {
+          if (this.game.isPainted(row, column)) {
+            this.drawPaintMask(ctx, boardX + column * cell, boardY + row * cell, cell, row, column);
+          }
+        }
+      }
+    }
+
     ctx.fillStyle = COLORS.softInk;
     ctx.font = `700 ${Math.max(9, Math.round(cell * 0.12))}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.12em";
@@ -372,6 +386,34 @@ export class GameWorld {
     ctx.fillText(`${this.game.difficulty} · 9 × 9`, boardX + boardSize, boardY - Math.max(13, cell * 0.26));
     ctx.textAlign = "left";
     ctx.letterSpacing = "0px";
+  }
+
+  private drawPaintMask(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number, row: number, column: number) {
+    const seed = (row + 1) * 37 + (column + 1) * 19;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + 1, y + 1, cell - 2, cell - 2);
+    ctx.clip();
+    ctx.fillStyle = "rgba(40,84,197,0.9)";
+    for (let index = 0; index < 6; index += 1) {
+      const angle = (seed + index * 61) * 0.11;
+      const centerX = x + cell * (0.5 + Math.cos(angle) * 0.18);
+      const centerY = y + cell * (0.5 + Math.sin(angle * 1.3) * 0.18);
+      const radius = cell * (0.3 + ((seed + index * 17) % 9) * 0.012);
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(255,252,245,0.34)";
+    ctx.lineWidth = Math.max(1, cell * 0.035);
+    for (let index = 0; index < 2; index += 1) {
+      const start = y + cell * (0.25 + index * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(x - cell * 0.05, start);
+      ctx.bezierCurveTo(x + cell * 0.3, start - cell * 0.18, x + cell * 0.68, start + cell * 0.18, x + cell * 1.05, start - cell * 0.04);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   private drawNotes(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number, notes: number[]) {

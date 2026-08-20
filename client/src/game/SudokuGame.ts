@@ -26,6 +26,8 @@ export class SudokuGame {
   conflictKeys = new Set<string>();
   mistakeKeys = new Set<string>();
   hintedKeys = new Set<string>();
+  paintedKeys = new Set<string>();
+  paintEventRemaining = 0;
   history: HistoryEntry[] = [];
   elapsedSeconds = 0;
   timeLimitSeconds = TIME_LIMIT_SECONDS["보통"];
@@ -37,6 +39,7 @@ export class SudokuGame {
   completedAt = 0;
   lastMessage = "칸을 선택해 숫자를 놓으세요.";
   private secondAccumulator = 0;
+  private nextPaintEventAt = Infinity;
 
   constructor(difficulty: Difficulty = "보통", demo = false) {
     this.newGame(difficulty);
@@ -56,6 +59,8 @@ export class SudokuGame {
     this.conflictKeys.clear();
     this.mistakeKeys.clear();
     this.hintedKeys.clear();
+    this.paintedKeys.clear();
+    this.paintEventRemaining = 0;
     this.history = [];
     this.elapsedSeconds = 0;
     this.timeLimitSeconds = TIME_LIMIT_SECONDS[difficulty];
@@ -66,6 +71,7 @@ export class SudokuGame {
     this.timedOut = false;
     this.completedAt = 0;
     this.secondAccumulator = 0;
+    this.nextPaintEventAt = difficulty === "어려움" ? 14 : Infinity;
     this.lastMessage = "새 타임어택 퍼즐을 준비했습니다.";
   }
 
@@ -93,6 +99,7 @@ export class SudokuGame {
     this.elapsedSeconds += seconds;
     this.remainingSeconds = Math.max(0, this.remainingSeconds - seconds);
     this.secondAccumulator -= seconds;
+    if (this.difficulty === "어려움") this.advancePaintEvent(seconds);
     if (this.remainingSeconds === 0) {
       this.timedOut = true;
       this.secondAccumulator = 0;
@@ -237,6 +244,10 @@ export class SudokuGame {
     this.lastMessage = "시간이 끝났습니다. 새 퍼즐로 다시 도전하세요.";
   }
 
+  forcePaintEventForPreview() {
+    if (this.difficulty === "어려움") this.startPaintEvent();
+  }
+
   isRelated(row: number, column: number) {
     const selected = this.selected;
     if (!selected) return false;
@@ -258,8 +269,42 @@ export class SudokuGame {
     return this.hintedKeys.has(keyOf(row, column));
   }
 
+  isPainted(row: number, column: number) {
+    return this.paintedKeys.has(keyOf(row, column));
+  }
+
   getHintsRemaining() {
     return Math.max(0, this.hintLimit - this.hintsUsed);
+  }
+
+  private advancePaintEvent(seconds: number) {
+    if (this.paintEventRemaining > 0) {
+      this.paintEventRemaining = Math.max(0, this.paintEventRemaining - seconds);
+      if (this.paintEventRemaining === 0) {
+        this.paintedKeys.clear();
+        this.lastMessage = "물감 번짐이 사라졌습니다. 계속 풀이하세요.";
+      }
+    }
+    if (this.paintEventRemaining === 0 && this.elapsedSeconds >= this.nextPaintEventAt) this.startPaintEvent();
+  }
+
+  private startPaintEvent() {
+    if (this.completed || this.timedOut || this.difficulty !== "어려움") return;
+    const candidates: CellPosition[] = [];
+    for (let row = 0; row < 9; row += 1) {
+      for (let column = 0; column < 9; column += 1) {
+        if (this.values[row][column] !== 0) candidates.push({ row, column });
+      }
+    }
+    for (let index = candidates.length - 1; index > 0; index -= 1) {
+      const next = Math.floor(Math.random() * (index + 1));
+      [candidates[index], candidates[next]] = [candidates[next], candidates[index]];
+    }
+    const maskCount = Math.min(candidates.length, 7);
+    this.paintedKeys = new Set(candidates.slice(0, maskCount).map(({ row, column }) => keyOf(row, column)));
+    this.paintEventRemaining = 5;
+    this.nextPaintEventAt = this.elapsedSeconds + 24 + Math.floor(Math.random() * 10);
+    this.lastMessage = "잉크 번짐! 일부 숫자가 5초 동안 가려집니다.";
   }
 
   private firstOpenCell(): CellPosition | null {
