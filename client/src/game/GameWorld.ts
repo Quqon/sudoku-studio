@@ -554,8 +554,8 @@ export class GameWorld {
   private drawTimeUp(ctx: CanvasRenderingContext2D, layout: Layout) {
     ctx.fillStyle = "rgba(34,33,30,0.38)";
     ctx.fillRect(0, 0, layout.width, layout.height);
-    const width = Math.min(layout.width * 0.55, 540);
-    const height = Math.min(layout.height * 0.35, 300);
+    const width = Math.min(layout.width * 0.86, 540);
+    const height = Math.min(Math.max(layout.height * 0.42, 248), 300);
     const x = (layout.width - width) / 2;
     const y = (layout.height - height) / 2;
     ctx.fillStyle = "rgba(255,252,245,0.98)";
@@ -570,8 +570,16 @@ export class GameWorld {
     ctx.fillText("TIME UP", x + width * 0.13, y + height * 0.27);
     ctx.letterSpacing = "0px";
     ctx.fillStyle = COLORS.ink;
-    ctx.font = `400 ${Math.max(30, height * 0.18)}px "DM Serif Display", Georgia, serif`;
-    ctx.fillText("시간이 끝났습니다.", x + width * 0.13, y + height * 0.5);
+    const title = "시간이 끝났습니다.";
+    const titleX = x + width * 0.13;
+    const titleMaxWidth = width * 0.74;
+    let titleSize = Math.min(Math.max(24, height * 0.18), Math.max(24, titleMaxWidth / 4.8));
+    ctx.font = `400 ${titleSize}px "DM Serif Display", Georgia, serif`;
+    while (ctx.measureText(title).width > titleMaxWidth && titleSize > 20) {
+      titleSize -= 1;
+      ctx.font = `400 ${titleSize}px "DM Serif Display", Georgia, serif`;
+    }
+    ctx.fillText(title, titleX, y + height * 0.5, titleMaxWidth);
     ctx.fillStyle = COLORS.softInk;
     ctx.font = `500 ${Math.max(12, height * 0.065)}px "IBM Plex Sans KR", sans-serif`;
     ctx.fillText(`${this.game.difficulty} · ${Math.ceil(this.game.timeLimitSeconds / 60)}분 타임어택`, x + width * 0.13, y + height * 0.65);
