@@ -175,16 +175,19 @@ export class GameWorld {
   private getLayout(width: number, height: number): Layout {
     const compact = width / height < 1.18 || width < 740;
     if (compact) {
-      const boardSize = Math.min(width * 0.75, height * 0.39);
+      const touchLayout = width <= 560;
+      const boardSize = touchLayout
+        ? Math.min(width * 0.66, height * 0.36)
+        : Math.min(width * 0.75, height * 0.39);
       return {
         width,
         height,
         boardX: (width - boardSize) / 2,
         boardY: Math.max(70, height * 0.09),
         boardSize,
-        sidebarX: width * 0.06,
+        sidebarX: touchLayout ? width * 0.04 : width * 0.06,
         sidebarY: Math.max(70, height * 0.09) + boardSize + Math.max(16, height * 0.02),
-        sidebarWidth: width * 0.88,
+        sidebarWidth: touchLayout ? width * 0.92 : width * 0.88,
         compact,
       };
     }
@@ -433,13 +436,14 @@ export class GameWorld {
 
   private drawSidebar(ctx: CanvasRenderingContext2D, layout: Layout) {
     const { sidebarX: x, sidebarY: y, sidebarWidth: width, compact } = layout;
+    const touchLayout = compact && layout.width <= 560;
     const scale = compact ? Math.max(0.8, layout.height / 1500) : 1;
-    const labelSize = compact ? Math.max(9, Math.round(layout.height * 0.012 * scale)) : Math.max(10, Math.round(layout.height * 0.014 * scale));
+    const labelSize = touchLayout ? Math.max(10, Math.round(layout.height * 0.013)) : compact ? Math.max(9, Math.round(layout.height * 0.012 * scale)) : Math.max(10, Math.round(layout.height * 0.014 * scale));
     const titleSize = compact ? Math.max(25, Math.round(layout.height * 0.035)) : Math.max(25, Math.round(layout.height * 0.043 * scale));
     const line = Math.max(1, layout.height * 0.0015);
     const progress = this.game.getProgress();
     const hintsRemaining = this.game.getHintsRemaining();
-    const panelHeight = compact ? layout.height - y - 12 : Math.min(layout.height * 0.74, 680);
+    const panelHeight = compact ? layout.height - y - (touchLayout ? 8 : 12) : Math.min(layout.height * 0.74, 680);
 
     ctx.fillStyle = "rgba(255,252,245,0.66)";
     ctx.fillRect(x, y, width, panelHeight);
@@ -454,7 +458,7 @@ export class GameWorld {
       ctx.restore();
     }
 
-    const pad = compact ? Math.max(14, width * 0.055) : Math.max(16, width * 0.09);
+    const pad = touchLayout ? Math.max(14, width * 0.047) : compact ? Math.max(14, width * 0.055) : Math.max(16, width * 0.09);
     ctx.fillStyle = COLORS.softInk;
     ctx.font = `700 ${labelSize}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.15em";
@@ -470,48 +474,48 @@ export class GameWorld {
     ctx.fillText(`타임어택 ${limitMinutes}분 · ${progress.filled}/${progress.total} 채움 · 힌트 ${hintsRemaining}/${this.game.hintLimit}`, x + width - pad, y + pad + labelSize + titleSize + 2);
     ctx.textAlign = "left";
 
-    const difficultyY = y + pad + labelSize + titleSize + (compact ? 18 : 34);
+    const difficultyY = y + pad + labelSize + titleSize + (touchLayout ? 14 : compact ? 18 : 34);
     const gap = compact ? 4 : 6;
     const tabWidth = (width - pad * 2 - gap * 2) / 3;
-    const tabHeight = compact ? Math.max(23, labelSize * 2.2) : Math.max(28, labelSize * 2.4);
+    const tabHeight = touchLayout ? 30 : compact ? Math.max(23, labelSize * 2.2) : Math.max(28, labelSize * 2.4);
     (["쉬움", "보통", "어려움"] as Difficulty[]).forEach((difficulty, index) => {
       this.drawButton(ctx, x + pad + index * (tabWidth + gap), difficultyY, tabWidth, tabHeight, difficulty, difficulty, this.game.difficulty === difficulty, layout);
     });
 
-    const progressY = difficultyY + tabHeight + (compact ? 17 : 24);
+    const progressY = difficultyY + tabHeight + (touchLayout ? 17 : compact ? 17 : 24);
     ctx.fillStyle = "rgba(34,33,30,0.1)";
     ctx.fillRect(x + pad, progressY, width - pad * 2, 5);
     ctx.fillStyle = COLORS.cobalt;
     ctx.fillRect(x + pad, progressY, (width - pad * 2) * progress.ratio, 5);
 
-    const actionY = progressY + (compact ? 20 : 28);
+    const actionY = progressY + (touchLayout ? 17 : compact ? 20 : 28);
     const actionGap = compact ? 4 : 7;
     const actionWidth = (width - pad * 2 - actionGap) / 2;
-    const actionHeight = compact ? Math.max(25, labelSize * 2.35) : Math.max(31, labelSize * 2.65);
+    const actionHeight = touchLayout ? 32 : compact ? Math.max(25, labelSize * 2.35) : Math.max(31, labelSize * 2.65);
     this.drawButton(ctx, x + pad, actionY, actionWidth, actionHeight, this.game.noteMode ? "메모 ON" : "메모", "notes", this.game.noteMode, layout);
     this.drawButton(ctx, x + pad + actionWidth + actionGap, actionY, actionWidth, actionHeight, "되돌리기", "undo", false, layout);
     this.drawButton(ctx, x + pad, actionY + actionHeight + actionGap, actionWidth, actionHeight, `힌트 · ${hintsRemaining}회`, "hint", false, layout, undefined, false, hintsRemaining === 0);
     this.drawButton(ctx, x + pad + actionWidth + actionGap, actionY + actionHeight + actionGap, actionWidth, actionHeight, "검증", "validate", false, layout);
 
-    const numberY = actionY + actionHeight * 2 + actionGap + (compact ? 17 : 24);
+    const numberY = actionY + actionHeight * 2 + actionGap + (touchLayout ? 16 : compact ? 17 : 24);
     ctx.fillStyle = COLORS.softInk;
     ctx.font = `700 ${labelSize}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.12em";
     ctx.fillText("NUMBER TRAY", x + pad, numberY);
     ctx.letterSpacing = "0px";
-    const numGap = compact ? 4 : 6;
+    const numGap = touchLayout ? 5 : compact ? 4 : 6;
     const numWidth = (width - pad * 2 - numGap * 2) / 3;
-    const numHeight = compact ? Math.max(24, labelSize * 2.4) : Math.max(33, labelSize * 2.9);
+    const numHeight = touchLayout ? Math.max(40, Math.min(46, width * 0.12)) : compact ? Math.max(24, labelSize * 2.4) : Math.max(33, labelSize * 2.9);
     for (let index = 0; index < 9; index += 1) {
       const row = Math.floor(index / 3);
       const column = index % 3;
-      this.drawButton(ctx, x + pad + column * (numWidth + numGap), numberY + (compact ? 9 : 12) + row * (numHeight + numGap), numWidth, numHeight, String(index + 1), "digit", false, layout, index + 1, true);
+      this.drawButton(ctx, x + pad + column * (numWidth + numGap), numberY + (touchLayout ? 10 : compact ? 9 : 12) + row * (numHeight + numGap), numWidth, numHeight, String(index + 1), "digit", false, layout, index + 1, true);
     }
-    const eraseY = numberY + (compact ? 9 : 12) + 3 * (numHeight + numGap) + (compact ? 3 : 5);
-    const eraseHeight = compact ? Math.max(24, labelSize * 2.25) : Math.max(29, labelSize * 2.45);
+    const eraseY = numberY + (touchLayout ? 10 : compact ? 9 : 12) + 3 * (numHeight + numGap) + (touchLayout ? 3 : compact ? 3 : 5);
+    const eraseHeight = touchLayout ? 36 : compact ? Math.max(24, labelSize * 2.25) : Math.max(29, labelSize * 2.45);
     this.drawButton(ctx, x + pad, eraseY, width - pad * 2, eraseHeight, "지우기", "erase", false, layout);
 
-    const messageY = Math.min(panelHeight - (compact ? 18 : 22), eraseY - y + eraseHeight + (compact ? 43 : Math.max(58, labelSize * 4.7)));
+    const messageY = Math.min(panelHeight - (compact ? 18 : 22), eraseY - y + eraseHeight + (touchLayout ? 33 : compact ? 43 : Math.max(58, labelSize * 4.7)));
     ctx.fillStyle = "rgba(40,84,197,0.09)";
     const messageHeight = compact ? 27 : 34;
     ctx.fillRect(x + pad, y + messageY - messageHeight, width - pad * 2, messageHeight);
