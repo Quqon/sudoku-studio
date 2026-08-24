@@ -42,17 +42,55 @@ interface Images {
   reference?: HTMLImageElement;
 }
 
-const COLORS = {
-  ink: "#22211e",
-  softInk: "#64615b",
-  cobalt: "#2854c5",
-  cobaltPale: "#dfe8fb",
-  hintInk: "#617918",
-  paper: "#f6f0e6",
-  paperDeep: "#ece3d4",
-  chartreuse: "#bad842",
-  vermilion: "#c9533a",
-  rule: "#b8b0a4",
+const THEMES = {
+  light: {
+    ink: "#22211e",
+    softInk: "#64615b",
+    cobalt: "#2854c5",
+    cobaltPale: "#dfe8fb",
+    hintInk: "#617918",
+    paper: "#f6f0e6",
+    paperDeep: "#ece3d4",
+    chartreuse: "#bad842",
+    vermilion: "#c9533a",
+    rule: "#b8b0a4",
+    bgOverlay: "rgba(0,0,0,0.1)",
+    boardBg: "rgba(255,253,248,0.82)",
+    sidebarBg: "rgba(255,252,245,0.66)",
+    sidebarBorder: "rgba(34,33,30,0.14)",
+    bgLines: "rgba(34,33,30,0.055)",
+    boardLines: "rgba(34,33,30,0.26)",
+    progressBg: "rgba(34,33,30,0.1)",
+    buttonShadow: "rgba(0, 0, 0, 0.2)",
+    buttonBg: "rgba(255,255,255,0.54)",
+    buttonDisabled: "rgba(34,33,30,0.05)",
+    buttonBorder: "rgba(34,33,30,0.24)",
+    buttonBorderDisabled: "rgba(34,33,30,0.11)"
+  },
+  dark: {
+    ink: "#ffffff",
+    softInk: "#a1a1aa",
+    cobalt: "#6366f1",
+    cobaltPale: "#3730a3",
+    hintInk: "#22c55e",
+    paper: "#09090b",
+    paperDeep: "#18181b",
+    chartreuse: "#10b981",
+    vermilion: "#ef4444",
+    rule: "#3f3f46",
+    bgOverlay: "rgba(0,0,0,0.1)",
+    boardBg: "rgba(24,24,27,0.82)",
+    sidebarBg: "rgba(24,24,27,0.66)",
+    sidebarBorder: "rgba(255,255,255,0.14)",
+    bgLines: "rgba(255,255,255,0.05)",
+    boardLines: "rgba(255,255,255,0.2)",
+    progressBg: "rgba(255,255,255,0.1)",
+    buttonShadow: "rgba(0, 0, 0, 0.4)",
+    buttonBg: "rgba(255,255,255,0.08)",
+    buttonDisabled: "rgba(255,255,255,0.05)",
+    buttonBorder: "rgba(255,255,255,0.15)",
+    buttonBorderDisabled: "rgba(255,255,255,0.1)"
+  }
 };
 
 export class GameWorld {
@@ -69,11 +107,14 @@ export class GameWorld {
   private layout: Layout | null = null;
   private dirty = true;
 
+  theme: "light" | "dark" = "light";
+
   constructor(
     private readonly scene: Scene,
     private readonly canvas: HTMLCanvasElement,
     private readonly plane: Mesh,
     private readonly camera: FreeCamera,
+    theme: "light" | "dark"
   ) {
     this.texture = new DynamicTexture("sudoku-editorial-ui", { width: 1600, height: 900 }, scene, true, Texture.TRILINEAR_SAMPLINGMODE);
     this.texture.hasAlpha = false;
@@ -81,6 +122,7 @@ export class GameWorld {
     this.input = new InputManager((action) => this.handleAction(action));
     this.onPointerDown = (event) => this.handlePointer(event);
     canvas.addEventListener("pointerdown", this.onPointerDown);
+    this.theme = theme;
     if (new URLSearchParams(window.location.search).has("timeout")) this.game.forceTimeUpForPreview();
     if (new URLSearchParams(window.location.search).has("paint")) this.game.forcePaintEventForPreview();
     this.loadImages();
@@ -103,6 +145,11 @@ export class GameWorld {
     this.camera.orthoBottom = -1;
     this.plane.scaling.x = aspect;
     this.plane.scaling.y = 1;
+    this.dirty = true;
+  }
+
+  setTheme(theme: "light" | "dark") {
+    this.theme = theme;
     this.dirty = true;
   }
 
@@ -158,8 +205,12 @@ export class GameWorld {
       if (hit.action === "undo") this.game.undo();
       if (hit.action === "hint") this.game.hint();
       if (hit.action === "validate") this.game.validate();
-      if (hit.action === "new") this.game.newGame();
-      if (["쉬움", "보통", "어려움"].includes(hit.action)) this.game.newGame(hit.action as Difficulty);
+      if (hit.action === "new") {
+        if (window.confirm("진행 중인 게임이 초기화됩니다. 계속하시겠습니까?")) this.game.newGame();
+      }
+      if (["쉬움", "보통", "어려움"].includes(hit.action)) {
+        if (window.confirm("진행 중인 게임이 초기화됩니다. 계속하시겠습니까?")) this.game.newGame(hit.action as Difficulty);
+      }
       this.dirty = true;
       return;
     }
@@ -177,8 +228,8 @@ export class GameWorld {
     if (compact) {
       const touchLayout = width <= 560;
       const boardSize = touchLayout
-        ? Math.min(width * 0.66, height * 0.36)
-        : Math.min(width * 0.75, height * 0.39);
+        ? Math.min(width * 0.85, height * 0.45)
+        : Math.min(width * 0.75, height * 0.45);
       return {
         width,
         height,
@@ -225,16 +276,20 @@ export class GameWorld {
   }
 
   private drawBackground(ctx: CanvasRenderingContext2D, layout: Layout) {
-    ctx.fillStyle = COLORS.paper;
+    ctx.fillStyle = THEMES[this.theme].paper;
     ctx.fillRect(0, 0, layout.width, layout.height);
-    if (this.images.paper) {
+    if (this.images.paper && this.theme === "light") {
       ctx.globalAlpha = 0.9;
       ctx.drawImage(this.images.paper, 0, 0, layout.width, layout.height);
       ctx.globalAlpha = 1;
+    } else if (this.images.paper && this.theme === "dark") {
+      ctx.globalAlpha = 0.05;
+      ctx.drawImage(this.images.paper, 0, 0, layout.width, layout.height);
+      ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.fillStyle = THEMES[this.theme].bgOverlay;
     ctx.fillRect(0, 0, layout.width, layout.height);
-    ctx.strokeStyle = "rgba(34,33,30,0.055)";
+    ctx.strokeStyle = THEMES[this.theme].bgLines;
     ctx.lineWidth = 1;
     const spacing = Math.max(34, Math.round(layout.height / 21));
     for (let y = spacing * 2; y < layout.height; y += spacing) {
@@ -245,7 +300,7 @@ export class GameWorld {
     }
     ctx.fillStyle = "rgba(40,84,197,0.06)";
     ctx.fillRect(0, 0, layout.width * 0.07, layout.height);
-    ctx.fillStyle = COLORS.chartreuse;
+    ctx.fillStyle = THEMES[this.theme].chartreuse;
     ctx.fillRect(layout.width * 0.069, layout.height * 0.086, 3, 38);
   }
 
@@ -257,11 +312,11 @@ export class GameWorld {
     if (this.images.mark) ctx.drawImage(this.images.mark, x, y, markSize, markSize);
     else this.drawFallbackMark(ctx, x, y, markSize);
 
-    ctx.fillStyle = COLORS.ink;
+    ctx.fillStyle = THEMES[this.theme].ink;
     ctx.font = `700 ${Math.round(markSize * (touchHeader ? 0.62 : 0.68))}px "DM Serif Display", Georgia, serif`;
     ctx.textBaseline = "alphabetic";
     ctx.fillText("SUDOKU", x + markSize + (touchHeader ? 8 : 13), y + markSize * 0.58);
-    ctx.fillStyle = COLORS.cobalt;
+    ctx.fillStyle = THEMES[this.theme].cobalt;
     ctx.font = `700 ${touchHeader ? 7 : Math.max(10, Math.round(markSize * 0.22))}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.18em";
     ctx.fillText("STUDIO / NO. 09", x + markSize + (touchHeader ? 9 : 16), y + markSize * 0.9);
@@ -275,7 +330,7 @@ export class GameWorld {
     this.drawButton(ctx, buttonX, y + (touchHeader ? 0 : 4), buttonWidth, buttonHeight, "새 게임", "new", false, layout);
 
     if (!layout.compact) {
-      ctx.fillStyle = COLORS.softInk;
+      ctx.fillStyle = THEMES[this.theme].softInk;
       ctx.font = `500 ${Math.max(10, Math.round(layout.height * 0.014))}px "IBM Plex Sans KR", sans-serif`;
       ctx.textAlign = "right";
       ctx.fillText("정확한 한 수를 위한 조용한 시간", Math.max(x + markSize + 215, buttonX - 18), y + buttonHeight * 0.65);
@@ -288,7 +343,7 @@ export class GameWorld {
     for (let row = 0; row < 3; row += 1) {
       for (let column = 0; column < 3; column += 1) {
         if (row === 1 && column === 1) continue;
-        ctx.fillStyle = row === 2 && column === 0 ? COLORS.cobalt : COLORS.ink;
+        ctx.fillStyle = row === 2 && column === 0 ? THEMES[this.theme].cobalt : THEMES[this.theme].ink;
         ctx.fillRect(x + column * unit, y + row * unit, unit * 0.62, unit * 0.62);
       }
     }
@@ -297,7 +352,7 @@ export class GameWorld {
   private drawBoard(ctx: CanvasRenderingContext2D, layout: Layout) {
     const { boardX, boardY, boardSize } = layout;
     const cell = boardSize / 9;
-    ctx.fillStyle = "rgba(255,253,248,0.82)";
+    ctx.fillStyle = THEMES[this.theme].boardBg;
     ctx.fillRect(boardX - 2, boardY - 2, boardSize + 4, boardSize + 4);
 
     for (let row = 0; row < 9; row += 1) {
@@ -326,14 +381,14 @@ export class GameWorld {
         if (selected) {
           ctx.fillStyle = "rgba(186,216,66,0.28)";
           ctx.fillRect(x, y, cell, cell);
-          ctx.strokeStyle = COLORS.cobalt;
+          ctx.strokeStyle = THEMES[this.theme].cobalt;
           ctx.lineWidth = Math.max(2, cell * 0.035);
           ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
         }
       }
     }
 
-    ctx.strokeStyle = "rgba(34,33,30,0.26)";
+    ctx.strokeStyle = THEMES[this.theme].boardLines;
     for (let index = 0; index <= 9; index += 1) {
       ctx.lineWidth = index % 3 === 0 ? Math.max(2.2, cell * 0.045) : Math.max(0.7, cell * 0.014);
       const offset = index === 9 ? -ctx.lineWidth / 2 : ctx.lineWidth / 2;
@@ -358,10 +413,10 @@ export class GameWorld {
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.font = `${this.game.given[row][column] ? 700 : 600} ${Math.round(cell * 0.52)}px "IBM Plex Sans KR", sans-serif`;
-          ctx.fillStyle = conflict ? COLORS.vermilion : hinted ? COLORS.hintInk : this.game.given[row][column] ? COLORS.ink : COLORS.cobalt;
+          ctx.fillStyle = conflict ? THEMES[this.theme].vermilion : hinted ? THEMES[this.theme].hintInk : this.game.given[row][column] ? THEMES[this.theme].ink : THEMES[this.theme].cobalt;
           ctx.fillText(String(value), x + cell / 2, y + cell / 2 + cell * 0.025);
           if (hinted) {
-            ctx.fillStyle = COLORS.hintInk;
+            ctx.fillStyle = THEMES[this.theme].hintInk;
             ctx.fillRect(x + cell * 0.76, y + cell * 0.76, Math.max(3, cell * 0.11), Math.max(3, cell * 0.11));
           }
           ctx.textAlign = "left";
@@ -382,7 +437,7 @@ export class GameWorld {
       }
     }
 
-    ctx.fillStyle = COLORS.softInk;
+    ctx.fillStyle = THEMES[this.theme].softInk;
     ctx.font = `700 ${Math.max(9, Math.round(cell * 0.12))}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.12em";
     ctx.fillText("PUZZLE FIELD", boardX, boardY - Math.max(13, cell * 0.26));
@@ -421,8 +476,8 @@ export class GameWorld {
   }
 
   private drawNotes(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number, notes: number[]) {
-    ctx.fillStyle = COLORS.cobalt;
-    ctx.font = `600 ${Math.max(8, Math.round(cell * 0.15))}px "IBM Plex Sans KR", sans-serif`;
+    ctx.fillStyle = THEMES[this.theme].cobalt;
+    ctx.font = `700 ${Math.max(12, Math.round(cell * 0.23))}px "IBM Plex Sans KR", sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     notes.forEach((note) => {
@@ -448,9 +503,9 @@ export class GameWorld {
       ? layout.height - y - (touchLayout ? 8 : 12)
       : Math.min(layout.height - y - Math.max(24, layout.height * 0.03), Math.max(720, layout.height * 0.74));
 
-    ctx.fillStyle = "rgba(255,252,245,0.66)";
+    ctx.fillStyle = THEMES[this.theme].sidebarBg;
     ctx.fillRect(x, y, width, panelHeight);
-    ctx.strokeStyle = "rgba(34,33,30,0.14)";
+    ctx.strokeStyle = THEMES[this.theme].sidebarBorder;
     ctx.lineWidth = line;
     ctx.strokeRect(x + line / 2, y + line / 2, width - line, panelHeight - line);
     if (compact && this.images.motif) {
@@ -462,15 +517,15 @@ export class GameWorld {
     }
 
     const pad = touchLayout ? Math.max(14, width * 0.047) : compact ? Math.max(14, width * 0.055) : Math.max(16, width * 0.09);
-    ctx.fillStyle = COLORS.softInk;
+    ctx.fillStyle = THEMES[this.theme].softInk;
     ctx.font = `700 ${labelSize}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.15em";
     ctx.fillText("MARGIN NOTES", x + pad, y + pad + labelSize);
     ctx.letterSpacing = "0px";
-    ctx.fillStyle = this.game.isLowOnTime() ? COLORS.vermilion : COLORS.ink;
+    ctx.fillStyle = this.game.isLowOnTime() ? THEMES[this.theme].vermilion : THEMES[this.theme].ink;
     ctx.font = `400 ${titleSize}px "DM Serif Display", Georgia, serif`;
     ctx.fillText(this.game.formatTime(), x + pad, y + pad + labelSize + titleSize + 8);
-    ctx.fillStyle = COLORS.softInk;
+    ctx.fillStyle = THEMES[this.theme].softInk;
     ctx.font = `500 ${labelSize}px "IBM Plex Sans KR", sans-serif`;
     ctx.textAlign = "right";
     const limitMinutes = Math.ceil(this.game.timeLimitSeconds / 60);
@@ -486,51 +541,48 @@ export class GameWorld {
     });
 
     const progressY = difficultyY + tabHeight + (touchLayout ? 17 : compact ? 17 : 24);
-    ctx.fillStyle = "rgba(34,33,30,0.1)";
+    ctx.fillStyle = THEMES[this.theme].progressBg;
     ctx.fillRect(x + pad, progressY, width - pad * 2, 5);
-    ctx.fillStyle = COLORS.cobalt;
+    ctx.fillStyle = THEMES[this.theme].cobalt;
     ctx.fillRect(x + pad, progressY, (width - pad * 2) * progress.ratio, 5);
 
     const actionY = progressY + (touchLayout ? 17 : compact ? 20 : 28);
     const actionGap = compact ? 4 : 7;
     const actionWidth = (width - pad * 2 - actionGap) / 2;
-    const actionHeight = touchLayout ? 32 : compact ? Math.max(25, labelSize * 2.35) : Math.max(31, labelSize * 2.65);
+    const actionHeight = touchLayout ? 44 : compact ? Math.max(30, labelSize * 2.35) : Math.max(31, labelSize * 2.65);
     this.drawButton(ctx, x + pad, actionY, actionWidth, actionHeight, this.game.noteMode ? "메모 ON" : "메모", "notes", this.game.noteMode, layout);
     this.drawButton(ctx, x + pad + actionWidth + actionGap, actionY, actionWidth, actionHeight, "되돌리기", "undo", false, layout);
     this.drawButton(ctx, x + pad, actionY + actionHeight + actionGap, actionWidth, actionHeight, `힌트 · ${hintsRemaining}회`, "hint", false, layout, undefined, false, hintsRemaining === 0);
     this.drawButton(ctx, x + pad + actionWidth + actionGap, actionY + actionHeight + actionGap, actionWidth, actionHeight, "검증", "validate", false, layout);
 
     const numberY = actionY + actionHeight * 2 + actionGap + (touchLayout ? 16 : compact ? 17 : 24);
-    ctx.fillStyle = COLORS.softInk;
+    ctx.fillStyle = THEMES[this.theme].softInk;
     ctx.font = `700 ${labelSize}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.12em";
     ctx.fillText("NUMBER TRAY", x + pad, numberY);
     ctx.letterSpacing = "0px";
     const numGap = touchLayout ? 5 : compact ? 4 : 6;
     const numWidth = (width - pad * 2 - numGap * 2) / 3;
-    const numHeight = touchLayout ? Math.max(40, Math.min(46, width * 0.12)) : compact ? Math.max(24, labelSize * 2.4) : Math.max(33, labelSize * 2.9);
+    const numHeight = touchLayout ? Math.max(44, Math.min(50, width * 0.14)) : compact ? Math.max(28, labelSize * 2.4) : Math.max(33, labelSize * 2.9);
     for (let index = 0; index < 9; index += 1) {
       const row = Math.floor(index / 3);
       const column = index % 3;
       this.drawButton(ctx, x + pad + column * (numWidth + numGap), numberY + (touchLayout ? 10 : compact ? 9 : 12) + row * (numHeight + numGap), numWidth, numHeight, String(index + 1), "digit", false, layout, index + 1, true);
     }
     const eraseY = numberY + (touchLayout ? 10 : compact ? 9 : 12) + 3 * (numHeight + numGap) + (touchLayout ? 3 : compact ? 3 : 5);
-    const eraseHeight = touchLayout ? 36 : compact ? Math.max(24, labelSize * 2.25) : Math.max(29, labelSize * 2.45);
+    const eraseHeight = touchLayout ? 44 : compact ? Math.max(30, labelSize * 2.25) : Math.max(36, labelSize * 2.45);
     this.drawButton(ctx, x + pad, eraseY, width - pad * 2, eraseHeight, "지우기", "erase", false, layout);
 
     const messageHeight = compact ? 27 : 34;
     const footerReserve = compact ? 18 : 26;
-    const messageTop = Math.min(
-      y + panelHeight - footerReserve - messageHeight,
-      eraseY + eraseHeight + (touchLayout ? 14 : compact ? 18 : 24),
-    );
+    const messageTop = eraseY + eraseHeight + (touchLayout ? 14 : compact ? 18 : 24);
     ctx.fillStyle = "rgba(40,84,197,0.09)";
     ctx.fillRect(x + pad, messageTop, width - pad * 2, messageHeight);
-    ctx.fillStyle = COLORS.cobalt;
+    ctx.fillStyle = THEMES[this.theme].cobalt;
     ctx.font = `500 ${Math.max(10, labelSize * 0.95)}px "IBM Plex Sans KR", sans-serif`;
     ctx.fillText(this.game.lastMessage, x + pad + 10, messageTop + messageHeight * 0.61, width - pad * 2 - 20);
 
-    ctx.fillStyle = COLORS.softInk;
+    ctx.fillStyle = THEMES[this.theme].softInk;
     ctx.font = `500 ${Math.max(9, labelSize * 0.86)}px "IBM Plex Sans KR", sans-serif`;
     ctx.fillText(compact ? "N 메모 · H 힌트 · V 검증" : "N 메모 · H 힌트 · V 검증 · Z 되돌리기", x + pad, y + panelHeight - (compact ? 10 : 13));
   }
@@ -549,18 +601,52 @@ export class GameWorld {
     number = false,
     disabled = false,
   ) {
-    ctx.fillStyle = disabled ? "rgba(34,33,30,0.05)" : active ? COLORS.cobalt : "rgba(255,255,255,0.54)";
-    ctx.fillRect(x, y, width, height);
-    ctx.strokeStyle = disabled ? "rgba(34,33,30,0.11)" : active ? COLORS.cobalt : "rgba(34,33,30,0.24)";
+    const radius = 2;
+    ctx.save();
+    
+    // Add shadow
+    if (!disabled) {
+      ctx.shadowColor = active ? `${THEMES[this.theme].cobalt}66` : THEMES[this.theme].buttonShadow;
+      ctx.shadowBlur = active ? 12 : 6;
+      ctx.shadowOffsetY = 3;
+    }
+
+    ctx.fillStyle = disabled ? THEMES[this.theme].buttonDisabled : active ? THEMES[this.theme].cobalt : THEMES[this.theme].buttonBg;
+    ctx.beginPath();
+    
+    // Polyfill for roundRect
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, width, height, radius);
+    } else {
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+    }
+    ctx.fill();
+    
+    // Reset shadow for stroke & text
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    
+    ctx.strokeStyle = disabled ? THEMES[this.theme].buttonBorderDisabled : active ? THEMES[this.theme].cobalt : THEMES[this.theme].buttonBorder;
     ctx.lineWidth = 1;
-    ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
-    ctx.fillStyle = disabled ? COLORS.softInk : active ? "#ffffff" : number ? COLORS.cobalt : COLORS.ink;
+    ctx.stroke();
+    
+    ctx.fillStyle = disabled ? THEMES[this.theme].softInk : active ? "#ffffff" : number ? THEMES[this.theme].cobalt : THEMES[this.theme].ink;
     ctx.font = `${number ? 700 : 600} ${number ? Math.max(16, height * 0.54) : Math.max(10, height * 0.34)}px ${number ? "\"DM Serif Display\", Georgia, serif" : "\"IBM Plex Sans KR\", sans-serif"}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, x + width / 2, y + height / 2 + 1);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
+    
+    ctx.restore();
     if (!disabled) this.hitTargets.push({ x, y, width, height, action, value });
   }
 
@@ -573,20 +659,20 @@ export class GameWorld {
     const y = (layout.height - height) / 2;
     ctx.fillStyle = "rgba(255,252,245,0.98)";
     ctx.fillRect(x, y, width, height);
-    ctx.strokeStyle = COLORS.ink;
+    ctx.strokeStyle = THEMES[this.theme].ink;
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
-    ctx.fillStyle = COLORS.chartreuse;
+    ctx.fillStyle = THEMES[this.theme].chartreuse;
     ctx.fillRect(x, y, 8, height);
-    ctx.fillStyle = COLORS.cobalt;
+    ctx.fillStyle = THEMES[this.theme].cobalt;
     ctx.font = `700 ${Math.max(12, height * 0.06)}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.16em";
     ctx.fillText("PUZZLE COMPLETE", x + width * 0.13, y + height * 0.27);
     ctx.letterSpacing = "0px";
-    ctx.fillStyle = COLORS.ink;
+    ctx.fillStyle = THEMES[this.theme].ink;
     ctx.font = `400 ${Math.max(30, height * 0.18)}px "DM Serif Display", Georgia, serif`;
     ctx.fillText("정확한 한 수였습니다.", x + width * 0.13, y + height * 0.5);
-    ctx.fillStyle = COLORS.softInk;
+    ctx.fillStyle = THEMES[this.theme].softInk;
     ctx.font = `500 ${Math.max(12, height * 0.065)}px "IBM Plex Sans KR", sans-serif`;
     ctx.fillText(`남은 시간 ${this.game.formatTime()} · ${this.game.difficulty} 난이도`, x + width * 0.13, y + height * 0.65);
     this.drawButton(ctx, x + width * 0.13, y + height * 0.74, width * 0.43, height * 0.14, "다음 퍼즐", "new", false, layout);
@@ -601,16 +687,16 @@ export class GameWorld {
     const y = (layout.height - height) / 2;
     ctx.fillStyle = "rgba(255,252,245,0.98)";
     ctx.fillRect(x, y, width, height);
-    ctx.strokeStyle = COLORS.ink;
+    ctx.strokeStyle = THEMES[this.theme].ink;
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
-    ctx.fillStyle = COLORS.vermilion;
+    ctx.fillStyle = THEMES[this.theme].vermilion;
     ctx.fillRect(x, y, 8, height);
     ctx.font = `700 ${Math.max(12, height * 0.06)}px "IBM Plex Sans KR", sans-serif`;
     ctx.letterSpacing = "0.16em";
     ctx.fillText("TIME UP", x + width * 0.13, y + height * 0.27);
     ctx.letterSpacing = "0px";
-    ctx.fillStyle = COLORS.ink;
+    ctx.fillStyle = THEMES[this.theme].ink;
     const title = "시간이 끝났습니다.";
     const titleX = x + width * 0.13;
     const titleMaxWidth = width * 0.74;
@@ -621,7 +707,7 @@ export class GameWorld {
       ctx.font = `400 ${titleSize}px "DM Serif Display", Georgia, serif`;
     }
     ctx.fillText(title, titleX, y + height * 0.5, titleMaxWidth);
-    ctx.fillStyle = COLORS.softInk;
+    ctx.fillStyle = THEMES[this.theme].softInk;
     ctx.font = `500 ${Math.max(12, height * 0.065)}px "IBM Plex Sans KR", sans-serif`;
     ctx.fillText(`${this.game.difficulty} · ${Math.ceil(this.game.timeLimitSeconds / 60)}분 타임어택`, x + width * 0.13, y + height * 0.65);
     this.drawButton(ctx, x + width * 0.13, y + height * 0.74, width * 0.43, height * 0.14, "다시 도전", "new", false, layout);

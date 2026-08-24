@@ -12,9 +12,10 @@ export interface GameHandle {
   scene: Scene;
   dispose: () => void;
   resize: () => void;
+  setTheme: (theme: "light" | "dark") => void;
 }
 
-export async function createGameScene(engine: Engine, canvas: HTMLCanvasElement): Promise<GameHandle> {
+export async function createGameScene(engine: Engine, canvas: HTMLCanvasElement, theme: "light" | "dark"): Promise<GameHandle> {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.965, 0.94, 0.90, 1);
   const camera = new FreeCamera("editorial-camera", new Vector3(0, 0, -10), scene);
@@ -29,7 +30,7 @@ export async function createGameScene(engine: Engine, canvas: HTMLCanvasElement)
   material.emissiveColor = new Color3(1, 1, 1);
   plane.material = material;
 
-  const world = new GameWorld(scene, canvas, plane, camera);
+  const world = new GameWorld(scene, canvas, plane, camera, theme);
   material.diffuseTexture = world.getTexture();
   material.opacityTexture = world.getTexture();
   scene.onBeforeRenderObservable.add(() => world.update(engine.getDeltaTime() / 1000));
@@ -41,5 +42,6 @@ export async function createGameScene(engine: Engine, canvas: HTMLCanvasElement)
       scene.dispose();
     },
     resize: () => world.resize(),
+    setTheme: (t) => world.setTheme(t),
   };
 }
