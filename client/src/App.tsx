@@ -13,7 +13,7 @@ function SudokuApp() {
         <Button
           variant="outline"
           size="icon"
-          className="absolute top-4 right-4 z-50 bg-background/50 backdrop-blur-sm border-0 bg-transparent text-current opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+          className={`absolute top-4 right-4 z-50 bg-background/50 backdrop-blur-sm border-0 bg-transparent opacity-70 hover:opacity-100 transition-opacity cursor-pointer ${theme === "dark" ? "text-white" : "text-black"}`}
           onClick={toggleTheme}
         >
           {theme === "dark" ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
